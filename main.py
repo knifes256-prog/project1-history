@@ -1,106 +1,96 @@
-    for idx, (year, era, title, desc) in enumerate(events):
-        if era not in chosen:
-            continue
-        st.markdown(f"### {year} · {era}")
-        left, right = st.columns([1, 2.7])
-        with left:
-            image_url = commons_image(f"{country_name} {title}")
-            if image_url:
-                st.image(image_url, use_container_width=True)
-            else:
-                st.caption("이 사건의 사진을 찾지 못했습니다.")
-        with right:
-            st.subheader(title)
-            st.write(desc)
-            people = []
-            for person in PEOPLE:
-                if person in title or person in desc:
-                    people.append(person)
-            # 일부 사건은 제목만으로 인물이 드러나지 않으므로 연대기 설명에 언급된 인물 위주로 표시
-            if people:
-                st.markdown("**주요 인물 (이름을 클릭하면 상세 설명 표시):**")
-                for person in people:
-                    render_person(person, f"{country_name}_{idx}")
-        st.divider()
+"""세계지도 역사 연대기 앱
+실행: streamlit run main.py
+"""
 
-def show_dynamic_timeline(events):
-    eras = list(dict.fromkeys(ev["era"] for ev in events))
-    chosen = st.multiselect("시대 필터", eras, default=eras, key="dynamic_eras")
-    for idx, event in enumerate(events):
-        if event["era"] not in chosen:
-            continue
-        st.markdown(f"### {event['year']} · {event['era']}")
-        left, right = st.columns([1, 2.7])
-        with left:
-            image_url = commons_image(event["image_query"])
-            if image_url:
-                st.image(image_url, use_container_width=True)
-            else:
-                st.caption("관련 이미지를 찾지 못했습니다.")
-        with right:
-            st.subheader(event["title"])
-            st.write(event["desc"])
-            candidates = event.get("people", [])
-            if candidates:
-                st.markdown("**관련 인물·문서 (이름을 클릭하면 상세 설명 표시):**")
-                for person in candidates:
-                    render_person(person, f"dynamic_{idx}")
-        st.divider()
+import re
+import pycountry
+import plotly.graph_objects as go
+import requests
+import streamlit as st
+from bs4 import BeautifulSoup
 
-# ---------------- 앱 본문 ----------------
-st.title("🌍 세계 역사 연대기 지도")
-st.caption("지도에서 나라를 클릭하거나 목록에서 선택하세요. 국기·사건 이미지·인물 상세 설명을 제공합니다.")
-st.info("파란색: 연대기가 내장된 국가 · 회색: 위키백과 자료에서 연대기를 구성하는 국가 · 주황색: 현재 선택한 국가")
+st.set_page_config(
+    page_title="세계 역사 연대기 지도",
+    page_icon="🌍",
+    layout="wide",
+)
 
-names = country_table()
-st.session_state.setdefault("iso", "KOR")
-st.session_state.setdefault("last_click", None)
-st.session_state.setdefault("active_person", None)
+# 국가코드(ISO-3) -> (한글 이름, [(연도, 시대, 제목, 설명), ...])
+# BC = 기원전
+HISTORY = {}
 
-fig = build_map(names, st.session_state["iso"])
-event = st.plotly_chart(fig, key="world_map", on_select="rerun",
-                        selection_mode="points", use_container_width=True)
-points = []
-try:
-    points = event.selection.points
-except Exception:
-    pass
-if points:
-    clicked = points[0].get("location")
-    if clicked and clicked != st.session_state["last_click"]:
-        st.session_state["last_click"] = clicked
-        st.session_state["iso"] = clicked
-        st.session_state["picker"] = clicked
-        st.rerun()
+HISTORY["KOR"] = ("대한민국(한반도)", [
+    ("BC 2333", "고대", "고조선 건국", "단군이 세웠다고 전해짐."),
+    ("BC 108", "고대", "고조선 멸망", "한나라 침공, 한사군 설치."),
+    ("BC 57~18", "삼국", "삼국 성립", "신라·고구려·백제 건국."),
+    ("372", "삼국", "고구려 불교 공인", "소수림왕, 태학 설립."),
+    ("660~668", "삼국", "백제·고구려 멸망", "나당 연합군에 패배."),
+    ("676", "남북국", "신라 삼국 통일", "북쪽엔 698년 발해 건국."),
+    ("918", "고려", "고려 건국", "왕건 건국, 936년 통일."),
+    ("1231", "고려", "몽골 침입", "강화도로 천도해 항쟁."),
+    ("1392", "조선", "조선 건국", "이성계, 한양에 도읍."),
+    ("1446", "조선", "훈민정음 반포", "세종이 1443년 창제."),
+    ("1592~1598", "조선", "임진왜란", "이순신과 의병이 막아냄."),
+    ("1636", "조선", "병자호란", "청에 항복(삼전도)."),
+    ("1876", "근대", "강화도 조약", "불평등 조약으로 개항."),
+    ("1910", "일제강점기", "국권 피탈", "일본의 강제 병합."),
+    ("1919", "일제강점기", "3·1 운동", "임시정부가 수립됨."),
+    ("1945", "현대", "광복과 분단", "38도선으로 남북 분할."),
+    ("1948", "현대", "정부 수립", "대한민국 정부 수립."),
+    ("1950~1953", "현대", "6·25 전쟁", "정전협정으로 중단."),
+    ("1960", "현대", "4·19 혁명", "이승만 정권 퇴진."),
+    ("1961~1979", "현대", "경제개발", "고도성장, 권위주의 통치."),
+    ("1987", "현대", "6월 민주항쟁", "직선제 개헌을 이끎."),
+    ("1988", "현대", "서울 올림픽", "국제적 위상이 높아짐."),
+    ("1997", "현대", "외환위기", "IMF 구제금융을 받음."),
+    ("2002", "현대", "한일 월드컵", "공동 개최, 4강 진출."),
+])
 
-def sort_key(i):
-    return (i not in HISTORY, label(i, names))
+HISTORY["JPN"] = ("일본", [
+    ("BC 14000경", "선사", "조몬 시대", "토기를 쓴 수렵·채집 사회."),
+    ("BC 300경", "고대", "야요이 시대", "벼농사와 금속기 전래."),
+    ("3세기", "고대", "야마타이국", "히미코 여왕의 연합 세력."),
+    ("538/552", "고대", "불교 전래", "백제에서 전해짐."),
+    ("645", "고대", "다이카 개신", "중앙집권 개혁 시작."),
+    ("710·794", "고대", "나라·헤이안 천도", "도읍을 두 차례 옮김."),
+    ("1185~1192", "중세", "가마쿠라 막부", "최초의 무사 정권."),
+    ("1274·1281", "중세", "몽골 침입", "태풍 등으로 실패."),
+    ("1336", "중세", "무로마치 막부", "아시카가 가문이 개창."),
+    ("1467", "중세", "오닌의 난", "전국시대의 계기."),
+    ("1543", "근세", "조총 전래", "포르투갈인이 전함."),
+    ("1603", "근세", "에도 막부", "약 260년 평화기."),
+    ("1853", "근대", "페리 내항", "미국의 개항 요구."),
+    ("1868", "근대", "메이지 유신", "천황 중심 근대화."),
+    ("1894~1905", "근대", "청일·러일 전쟁", "제국주의 열강으로 부상."),
+    ("1931~1945", "근현대", "침략과 패전", "태평양 전쟁, 1945년 패전."),
+    ("1947", "현대", "평화헌법", "전쟁 포기를 명시."),
+    ("1964", "현대", "도쿄 올림픽", "전후 부흥의 상징."),
+    ("1991", "현대", "버블 붕괴", "장기 불황의 시작."),
+])
 
-sorted_isos = sorted(names, key=sort_key)
-def on_pick():
-    st.session_state["iso"] = st.session_state["picker"]
+HISTORY["CHN"] = ("중국", [
+    ("BC 2070경", "고대", "하(夏)", "전승상 최초의 왕조."),
+    ("BC 1600경", "고대", "상(商)", "갑골문과 청동기 문명."),
+    ("BC 1046", "고대", "주(周)", "봉건제, 이후 춘추전국."),
+    ("BC 551", "고대", "공자 탄생", "제자백가의 시대."),
+    ("BC 221", "고대", "진의 통일", "진시황, 군현제 시행."),
+    ("BC 202", "고대", "한(漢)", "유교 발전, 실크로드."),
+    ("220", "중세", "삼국·위진남북조", "분열기가 이어짐."),
+    ("589·618", "중세", "수·당", "수가 통일, 당이 번영."),
+    ("960", "중세", "송(宋)", "활자·나침반·화약 발달."),
+    ("1271", "중세", "원(元)", "쿠빌라이가 세움."),
+    ("1368", "근세", "명(明)", "주원장이 한족 왕조 회복."),
+    ("1644", "근세", "청(淸)", "마지막 왕조."),
+    ("1840", "근대", "아편전쟁", "난징조약, 개항."),
+    ("1911", "근대", "신해혁명", "청 멸망, 중화민국."),
+    ("1937~1945", "근현대", "중일전쟁", "일본의 전면 침략."),
+    ("1949", "현대", "중화인민공화국", "공산당 정권 수립."),
+    ("1966~1976", "현대", "문화대혁명", "큰 혼란과 희생."),
+    ("1978", "현대", "개혁·개방", "덩샤오핑, 고도성장."),
+    ("2001", "현대", "WTO 가입", "세계 무역에 편입."),
+])
 
-st.session_state.setdefault("picker", st.session_state["iso"])
-st.selectbox("또는 목록에서 나라 선택", sorted_isos,
-             format_func=lambda i: f"{flag_emoji(i)} {label(i, names)}",
-             key="picker", on_change=on_pick)
-
-iso = st.session_state["iso"]
-country_name = label(iso, names)
-st.divider()
-st.header(f"{flag_emoji(iso)} 📜 {country_name}의 역사 연대기")
-
-if iso in HISTORY:
-    show_curated_timeline(HISTORY[iso][1], country_name)
-    st.caption("※ 기존 내장 사건에 사건별 이미지를 연결합니다. 사진 검색 결과는 Wikimedia Commons에서 제공됩니다.")
-else:
-    st.caption("이 국가에는 별도 내장 연대기가 없어 위키백과의 역사 문서에서 시대별 문단을 추출합니다. 자동 추출 결과는 참고용이므로 문서 링크로 교차 확인하세요.")
-    with st.spinner(f"{country_name}의 역사 자료를 찾는 중..."):
-        events, source_url = wiki_timeline(names.get(iso, iso))
-    if events:
-        show_dynamic_timeline(events)
-        if source_url:
-            st.markdown(f"[역사 자료 원문 열기]({source_url})")
-    else:
-        st.warning("자동으로 연대기를 만들지 못했습니다. 인터넷 연결을 확인하거나 아래에서 문서를 직접 열어 보세요.")
-        st.markdown(f"[{country_name} 역사 문서 검색](https://en.wikipedia.org/wiki/Special:Search?search=History+of+{country_name.replace(' ', '+')})")
+HISTORY["USA"] = ("미국", [
+    ("1607", "식민지", "제임스타운", "영국의 첫 영구 식민지."),
+    ("1620", "식민지", "메이플라워호", "청교도가 정착."),
+    ("1776", "건국", "독립선언", "영국에서 독립 선언."),
