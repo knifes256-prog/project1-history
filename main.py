@@ -1,128 +1,192 @@
-    )
-    return fig
 
-def render_person(name, key):
-    """굵게+밑줄이 적용된 클릭 버튼으로 인물 설명을 펼칩니다."""
-    st.markdown(
-        "<style>div[data-testid='stButton'] button p {font-weight:700;text-decoration:underline;}</style>",
-        unsafe_allow_html=True,
-    )
-    safe_key = re.sub(r"[^a-zA-Z0-9가-힣]+", "_", f"{key}_{name}")[:180]
-    if st.button(f"**{name}**", key=f"person_{safe_key}", help="클릭하면 인물 상세 설명이 표시됩니다"):
-        st.session_state["active_person"] = name
-    if st.session_state.get("active_person") == name:
-        with st.container(border=True):
-            with st.spinner(f"{name}의 정보를 불러오는 중..."):
-                info = person_detail(name)
-            st.subheader(info["title"])
-            if info.get("image"):
-                st.image(info["image"], width=220)
-            st.write(info.get("extract") or "설명을 찾지 못했습니다.")
-            st.markdown(f"[관련 문서 열기]({info['url']})")
-            if st.button("상세 설명 닫기", key=f"close_{safe_key}"):
-                st.session_state["active_person"] = None
-                st.rerun()
+HISTORY["ITA"] = ("이탈리아", [
+    ("BC 753", "고대", "로마 건국(전승)", "로물루스가 세움."),
+    ("BC 509", "고대", "로마 공화정", "왕정을 폐지."),
+    ("BC 27", "고대", "로마 제정", "아우구스투스 즉위."),
+    ("476", "중세", "서로마 멸망", "게르만 용병대장이 폐위."),
+    ("14~16세기", "근세", "르네상스", "피렌체 중심의 부흥."),
+    ("1861", "근대", "이탈리아 통일", "카보우르·가리발디."),
+    ("1922", "현대", "무솔리니 집권", "파시스트 정권."),
+    ("1946", "현대", "공화국 선포", "국민투표로 왕정 폐지."),
+    ("1957", "현대", "로마 조약", "EEC 원회원국."),
+])
 
-def show_curated_timeline(events, country_name):
-    eras = list(dict.fromkeys(ev[1] for ev in events))
-    chosen = st.multiselect("시대 필터", eras, default=eras)
-    for idx, (year, era, title, desc) in enumerate(events):
-        if era not in chosen:
-            continue
-        st.markdown(f"### {year} · {era}")
-        left, right = st.columns([1, 2.7])
-        with left:
-            image_url = commons_image(f"{country_name} {title}")
-            if image_url:
-                st.image(image_url, use_container_width=True)
-            else:
-                st.caption("이 사건의 사진을 찾지 못했습니다.")
-        with right:
-            st.subheader(title)
-            st.write(desc)
-            people = []
-            for person in PEOPLE:
-                if person in title or person in desc:
-                    people.append(person)
-            # 일부 사건은 제목만으로 인물이 드러나지 않으므로 연대기 설명에 언급된 인물 위주로 표시
-            if people:
-                st.markdown("**주요 인물 (이름을 클릭하면 상세 설명 표시):**")
-                for person in people:
-                    render_person(person, f"{country_name}_{idx}")
-        st.divider()
+HISTORY["EGY"] = ("이집트", [
+    ("BC 3100경", "고대", "이집트 통일", "상·하 이집트가 통일됨."),
+    ("BC 2560경", "고대", "대피라미드", "쿠푸왕의 피라미드."),
+    ("BC 1550경", "고대", "신왕국", "람세스 2세 등 전성기."),
+    ("BC 332", "고대", "알렉산드로스 정복", "프톨레마이오스 왕조로."),
+    ("BC 30", "고대", "로마에 병합", "클레오파트라 7세."),
+    ("641", "중세", "이슬람 정복", "아랍군이 정복."),
+    ("969", "중세", "카이로 건설", "파티마 왕조."),
+    ("1517", "근세", "오스만 편입", "오스만의 지배."),
+    ("1798", "근대", "나폴레옹 원정", "근대화의 계기."),
+    ("1869", "근대", "수에즈 운하", "무역의 요충지."),
+    ("1952", "현대", "이집트 혁명", "왕정 붕괴, 나세르."),
+    ("1979", "현대", "이스라엘과 평화", "아랍권 최초."),
+    ("2011", "현대", "1·25 혁명", "무바라크 퇴진."),
+])
 
-def show_dynamic_timeline(events):
-    eras = list(dict.fromkeys(ev["era"] for ev in events))
-    chosen = st.multiselect("시대 필터", eras, default=eras, key="dynamic_eras")
-    for idx, event in enumerate(events):
-        if event["era"] not in chosen:
-            continue
-        st.markdown(f"### {event['year']} · {event['era']}")
-        left, right = st.columns([1, 2.7])
-        with left:
-            image_url = commons_image(event["image_query"])
-            if image_url:
-                st.image(image_url, use_container_width=True)
-            else:
-                st.caption("관련 이미지를 찾지 못했습니다.")
-        with right:
-            st.subheader(event["title"])
-            st.write(event["desc"])
-            candidates = event.get("people", [])
-            if candidates:
-                st.markdown("**관련 인물·문서 (이름을 클릭하면 상세 설명 표시):**")
-                for person in candidates:
-                    render_person(person, f"dynamic_{idx}")
-        st.divider()
+HISTORY["IND"] = ("인도", [
+    ("BC 2600경", "고대", "인더스 문명", "계획도시가 발달."),
+    ("BC 1500경", "고대", "베다 시대", "카스트제도의 기원."),
+    ("BC 5세기경", "고대", "불교 창시", "고타마 싯다르타."),
+    ("BC 321", "고대", "마우리아 왕조", "아소카왕 때 최대 영토."),
+    ("320", "고대", "굽타 왕조", "고전 문화의 황금기."),
+    ("1206", "중세", "델리 술탄조", "이슬람 왕조 성립."),
+    ("1526", "근세", "무굴 제국", "타지마할이 건립됨."),
+    ("1757", "근대", "플라시 전투", "영국 지배가 본격화."),
+    ("1857", "근대", "세포이 항쟁", "영국 직접 통치로."),
+    ("1947", "현대", "독립과 분리", "인도·파키스탄 분리."),
+    ("1950", "현대", "공화국 헌법", "최대의 민주주의 국가."),
+    ("1991", "현대", "경제 자유화", "고성장 시대."),
+])
 
-# ---------------- 앱 본문 ----------------
-st.title("🌍 세계 역사 연대기 지도")
-st.caption("지도에서 나라를 클릭하거나 목록에서 선택하세요. 국기·사건 이미지·인물 상세 설명을 제공합니다.")
-st.info("파란색: 연대기가 내장된 국가 · 회색: 위키백과 자료에서 연대기를 구성하는 국가 · 주황색: 현재 선택한 국가")
+HISTORY["RUS"] = ("러시아", [
+    ("862", "중세", "루스의 기원", "류리크가 정착했다고 전해짐."),
+    ("988", "중세", "기독교 수용", "동방 정교를 받아들임."),
+    ("1240~1480", "중세", "몽골 지배", "이후 모스크바가 독립."),
+    ("1547", "근세", "차르국 성립", "이반 4세 즉위."),
+    ("1613", "근세", "로마노프 왕조", "새 왕조가 열림."),
+    ("1703", "근대", "상트페테르부르크", "표트르 대제의 개혁."),
+    ("1812", "근대", "나폴레옹 격퇴", "조국전쟁 승리."),
+    ("1861", "근대", "농노 해방령", "알렉산드르 2세."),
+    ("1917", "현대", "러시아 혁명", "볼셰비키 집권."),
+    ("1922", "현대", "소련 성립", "사회주의 연방 국가."),
+    ("1941~1945", "현대", "대조국전쟁", "승리했으나 희생이 큼."),
+    ("1991", "현대", "소련 해체", "러시아 연방 출범."),
+])
 
-names = country_table()
-st.session_state.setdefault("iso", "KOR")
-st.session_state.setdefault("last_click", None)
-st.session_state.setdefault("active_person", None)
+HISTORY["GRC"] = ("그리스", [
+    ("BC 2000경", "고대", "미노아 문명", "크레타의 청동기 문명."),
+    ("BC 1600경", "고대", "미케네 문명", "트로이 전쟁 전승의 배경."),
+    ("BC 776", "고대", "첫 올림피아 경기", "고대 올림픽 시작."),
+    ("BC 508", "고대", "아테네 민주정", "클레이스테네스 개혁."),
+    ("BC 490·480", "고대", "페르시아 전쟁", "마라톤·살라미스 승리."),
+    ("BC 431~404", "고대", "펠로폰네소스 전쟁", "폴리스가 쇠퇴."),
+    ("BC 336~323", "고대", "알렉산드로스 대왕", "헬레니즘 세계를 엶."),
+    ("BC 146", "고대", "로마에 병합", "로마의 지배."),
+    ("1453", "중세", "오스만 지배", "비잔티움 멸망 이후."),
+    ("1821~1832", "근대", "독립 전쟁", "독립 왕국 수립."),
+    ("1981", "현대", "EC 가입", "유럽공동체에 가입."),
+])
 
-fig = build_map(names, st.session_state["iso"])
-event = st.plotly_chart(fig, key="world_map", on_select="rerun",
-                        selection_mode="points", use_container_width=True)
-points = []
-try:
-    points = event.selection.points
-except Exception:
-    pass
-if points:
-    clicked = points[0].get("location")
-    if clicked and clicked != st.session_state["last_click"]:
-        st.session_state["last_click"] = clicked
-        st.session_state["iso"] = clicked
-        st.session_state["picker"] = clicked
-        st.rerun()
+HISTORY["TUR"] = ("튀르키예", [
+    ("BC 1600경", "고대", "히타이트 제국", "철기 문화로 번성."),
+    ("330", "고대", "콘스탄티노폴리스", "콘스탄티누스 1세 천도."),
+    ("1071", "중세", "만지케르트 전투", "셀주크가 비잔티움 격파."),
+    ("1299", "중세", "오스만 제국 건국", "오스만 1세."),
+    ("1453", "근세", "콘스탄티노폴리스 함락", "비잔티움 멸망."),
+    ("1520~1566", "근세", "쉴레이만 대제", "오스만의 전성기."),
+    ("1683", "근세", "빈 포위 실패", "영토가 줄기 시작."),
+    ("1914~1918", "현대", "1차 대전 패전", "제국 분할."),
+    ("1923", "현대", "튀르키예 공화국", "아타튀르크의 개혁."),
+])
 
-def sort_key(i):
-    return (i not in HISTORY, label(i, names))
+HISTORY["BRA"] = ("브라질", [
+    ("1500", "식민지", "카브랄 도착", "포르투갈이 영유 선언."),
+    ("16세기", "식민지", "사탕수수와 노예제", "노예 노동 기반 경제."),
+    ("1808", "식민지", "왕실 이주", "리우데자네이루로 이전."),
+    ("1822", "제국", "독립 선언", "페드루 1세."),
+    ("1888", "제국", "노예제 폐지", "황금법 제정."),
+    ("1889", "공화국", "공화정 선포", "군부 쿠데타로 왕정 종식."),
+    ("1930", "공화국", "바르가스 집권", "산업화 정책."),
+    ("1964~1985", "공화국", "군사독재", "이후 민정 이양."),
+    ("1988", "공화국", "신헌법", "민주 헌법 제정."),
+])
 
-sorted_isos = sorted(names, key=sort_key)
-def on_pick():
-    st.session_state["iso"] = st.session_state["picker"]
 
-st.session_state.setdefault("picker", st.session_state["iso"])
-st.selectbox("또는 목록에서 나라 선택", sorted_isos,
-             format_func=lambda i: f"{flag_emoji(i)} {label(i, names)}",
-             key="picker", on_change=on_pick)
 
-iso = st.session_state["iso"]
-country_name = label(iso, names)
-st.divider()
-st.header(f"{flag_emoji(iso)} 📜 {country_name}의 역사 연대기")
+import re
+import html
+from bs4 import BeautifulSoup
 
-if iso in HISTORY:
-    show_curated_timeline(HISTORY[iso][1], country_name)
-    st.caption("※ 기존 내장 사건에 사건별 이미지를 연결합니다. 사진 검색 결과는 Wikimedia Commons에서 제공됩니다.")
-else:
-    st.caption("이 국가에는 별도 내장 연대기가 없어 위키백과의 역사 문서에서 시대별 문단을 추출합니다. 자동 추출 결과는 참고용이므로 문서 링크로 교차 확인하세요.")
-    with st.spinner(f"{country_name}의 역사 자료를 찾는 중..."):
-        events, source_url = wiki_timeline(names.get(iso, iso))
-    if events:
+WIKI_API = "https://en.wikipedia.org/w/api.php"
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+
+# 주요 인물 설명: 기존 내장 연대기에서 자주 등장하는 인물들을 우선 제공.
+# 새 국가/사건은 Wikipedia 링크에서 인물 문서를 찾아 상세 설명을 불러옵니다.
+PEOPLE = {
+    "단군": "고조선을 세웠다고 전해지는 인물이다. 단군 신화는 한국 고대 국가의 기원과 건국 이념을 이해하는 중요한 자료이다.",
+    "세종": "조선 제4대 국왕이다. 훈민정음 창제를 주도했으며 과학·문화·제도 발전을 추진했다.",
+    "이순신": "조선의 무신으로 임진왜란 때 수군을 이끌었다. 한산도 대첩 등에서 활약했다.",
+    "왕건": "고려를 건국하고 후삼국을 통일한 고려 태조이다.",
+    "이성계": "조선의 건국자이자 태조이다. 고려 말 권력을 장악한 뒤 1392년 조선을 세웠다.",
+    "히미코": "3세기 일본 열도의 야마타이국을 다스린 것으로 중국 사서에 기록된 여왕이다.",
+    "진시황": "중국을 최초로 통일한 진나라의 황제이다. 문자·도량형을 통일하고 중앙집권 체제를 강화했다.",
+    "공자": "중국 춘추 시대의 사상가로 인(仁)과 예(禮)를 강조했다. 유교 사상의 형성에 큰 영향을 주었다.",
+    "쿠빌라이": "몽골 제국의 칸이자 원나라를 세운 황제이다.",
+    "덩샤오핑": "중국의 지도자로 1978년 이후 개혁·개방 정책을 추진했다.",
+    "조지 워싱턴": "미국 독립전쟁의 총사령관이자 초대 대통령이다.",
+    "에이브러햄 링컨": "미국의 제16대 대통령이다. 남북전쟁을 이끌었으며 노예제 폐지를 추진했다.",
+    "마틴 루터 킹": "미국의 흑인 민권운동 지도자로 비폭력 저항과 인종 평등을 주장했다.",
+    "윌리엄 1세": "1066년 노르만 정복을 이끌고 잉글랜드 왕이 되었다.",
+    "마틴 루터": "독일의 종교개혁가로 1517년 면벌부 비판을 계기로 종교개혁 운동에 영향을 주었다.",
+    "비스마르크": "프로이센의 정치가로 외교와 전쟁을 통해 1871년 독일 통일을 이끌었다.",
+    "율리우스 카이사르": "로마의 장군이자 정치가로 갈리아를 정복하고 로마 공화정 말기의 권력 투쟁에서 핵심 역할을 했다.",
+    "아우구스투스": "로마의 초대 황제로 원수정을 세우고 제국의 기반을 다졌다.",
+    "가리발디": "이탈리아 통일 운동의 군사 지도자이다.",
+    "클레오파트라": "프톨레마이오스 왕조의 마지막 통치자 중 한 명으로 로마의 권력자들과 외교 관계를 맺었다.",
+    "아소카": "마우리아 왕조의 왕으로 불교를 후원하고 인도 아대륙의 넓은 지역을 통치했다.",
+    "간디": "인도 독립운동 지도자로 비폭력·불복종 운동을 이끌었다.",
+    "표트르 대제": "러시아의 황제로 군사·행정 개혁과 서유럽식 근대화를 추진했다.",
+    "블라디미르 레닌": "러시아 혁명에서 볼셰비키를 이끌고 소련 성립의 기반을 마련했다.",
+    "알렉산드로스": "마케도니아의 왕으로 페르시아 제국을 정복하고 헬레니즘 문화 확산의 계기를 만들었다.",
+    "오스만 1세": "오스만 왕조의 창시자로 여겨지는 인물이다.",
+    "무스타파 케말 아타튀르크": "튀르키예 공화국의 초대 대통령으로 세속화와 근대화 개혁을 추진했다.",
+    "페드루 1세": "브라질 독립을 선언하고 브라질 제국의 초대 황제가 되었다.",
+    "나폴레옹": "프랑스의 군인·정치가로 프랑스 혁명 이후 권력을 잡고 유럽 여러 지역을 지배했다.",
+    "잔 다르크": "백년전쟁 중 프랑스군의 사기를 높인 인물로, 프랑스의 국가적 상징이 되었다.",
+    "루이 14세": "프랑스의 국왕으로 절대왕정의 전성기를 상징한다.",
+}
+
+def country_table():
+    """ISO-3 코드와 영문 이름 목록."""
+    return {c.alpha_3: c.name for c in pycountry.countries}
+
+def flag_emoji(iso3):
+    """ISO-3 국가 코드에서 국기 이모지를 만듭니다."""
+    country = pycountry.countries.get(alpha_3=iso3)
+    if not country or not getattr(country, "alpha_2", None):
+        return "🌐"
+    return "".join(chr(127397 + ord(ch)) for ch in country.alpha_2.upper())
+
+def label(iso, names):
+    if iso in HISTORY:
+        return HISTORY[iso][0]
+    return names.get(iso, iso)
+
+def wiki_request(params, api=WIKI_API):
+    try:
+        response = requests.get(
+            api, params=params,
+            headers={"User-Agent": "WorldHistoryTimeline/2.0 (educational app)"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        return response.json()
+    except (requests.RequestException, ValueError):
+        return {}
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def wiki_summary(title):
+    data = wiki_request({
+        "action": "query", "format": "json", "redirects": 1,
+        "prop": "extracts|pageimages|info", "exintro": 1,
+        "explaintext": 1, "piprop": "thumbnail", "pithumbsize": 900,
+        "inprop": "url", "titles": title,
+    })
+    pages = data.get("query", {}).get("pages", {})
+    page = next(iter(pages.values()), {})
+    if "missing" in page:
+        return None
+    return {
+        "title": page.get("title", title),
+        "extract": page.get("extract", ""),
+        "image": page.get("thumbnail", {}).get("source"),
+        "url": page.get("fullurl", "https://en.wikipedia.org/wiki/" + title.replace(" ", "_")),
+    }
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def commons_image(query):
+    """사건명에 맞는 Wikimedia Commons 이미지를 찾습니다."""
